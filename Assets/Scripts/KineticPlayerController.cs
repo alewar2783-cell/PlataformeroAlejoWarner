@@ -69,6 +69,9 @@ public class KineticPlayerController : MonoBehaviour
     [SerializeField] private float maxFOV = 95f;
     [SerializeField] private float fovTransitionSpeed = 5f;
 
+    [Header("VFX")]
+    [SerializeField] private KineticVFXManager vfxManager;
+
     // State Variables
     private Rigidbody rb;
     private Vector2 inputDirection;
@@ -316,6 +319,8 @@ public class KineticPlayerController : MonoBehaviour
 
     private void Jump()
     {
+        if (vfxManager != null) vfxManager.PlayJumpBurst();
+        
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         float jumpVel = Mathf.Sqrt(2f * Mathf.Abs(Physics.gravity.y) * jumpHeight);
         rb.AddForce(transform.up * jumpVel, ForceMode.VelocityChange);
@@ -323,6 +328,8 @@ public class KineticPlayerController : MonoBehaviour
 
     private void DoubleJump()
     {
+        if (vfxManager != null) vfxManager.PlayJumpBurst();
+        
         canDoubleJump = false;
         
         // Preserve X and Z velocity (could be dash velocity or air velocity), apply exact Y jump
@@ -333,6 +340,8 @@ public class KineticPlayerController : MonoBehaviour
 
     private void StartDash()
     {
+        if (vfxManager != null) vfxManager.PlayDashBurst();
+        
         currentStamina -= dashStaminaCost;
         currentState = PlayerState.Dashing;
         dashTimeLeft = dashDuration;
@@ -426,6 +435,8 @@ public class KineticPlayerController : MonoBehaviour
 
     private void WallJump()
     {
+        if (vfxManager != null) vfxManager.PlayJumpBurst();
+        
         Vector3 wallNormal = isWallRight ? rightWallHit.normal : leftWallHit.normal;
         Vector3 forceToApply = orientation.forward * wallJumpForwardForce + wallNormal * wallJumpSideForce + transform.up * wallJumpUpForce;
 
