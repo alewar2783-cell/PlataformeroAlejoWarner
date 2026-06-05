@@ -47,18 +47,11 @@ public class SceneSetupWizard : EditorWindow
         mainCamera.transform.localPosition = new Vector3(0f, 0.6f, 0f); // Eye level
         mainCamera.transform.localRotation = Quaternion.identity;
 
-        // Add Look script
-        PlayerLook playerLook = mainCamera.AddComponent<PlayerLook>();
-
         // Link references via SerializedObject to automate the inspector work
         SerializedObject controllerSO = new SerializedObject(controller);
         controllerSO.FindProperty("playerCamera").objectReferenceValue = mainCamera.GetComponent<Camera>();
         controllerSO.FindProperty("orientation").objectReferenceValue = orientation.transform;
         controllerSO.ApplyModifiedProperties();
-
-        SerializedObject lookSO = new SerializedObject(playerLook);
-        lookSO.FindProperty("orientation").objectReferenceValue = orientation.transform;
-        lookSO.ApplyModifiedProperties();
 
         Selection.activeGameObject = player;
 

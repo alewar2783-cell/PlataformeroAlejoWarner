@@ -88,6 +88,14 @@ public class KineticPlayerController : MonoBehaviour
     private RaycastHit leftWallHit;
     private RaycastHit rightWallHit;
 
+    // --- Public Getters for UI and Camera ---
+    public float CurrentStamina => currentStamina;
+    public float MaxStamina => maxStamina;
+    public PlayerState CurrentState => currentState;
+    public float CurrentSpeed => new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z).magnitude;
+    public float WalkSpeed => walkSpeed;
+    public float RunSpeed => runSpeed;
+
     private void Start()
     {
         rb = GetComponent<Rigidbody>();
@@ -137,15 +145,21 @@ public class KineticPlayerController : MonoBehaviour
         ReadInput();
         DetermineState();
         UpdateStamina();
-        UpdateCameraFOV();
+        // UpdateCameraFOV(); // Disabled for Third Person transition
+        
+        // Auto-sync orientation with camera yaw for true 3rd person movement
+        if (orientation != null && playerCamera != null)
+        {
+            orientation.rotation = Quaternion.Euler(0f, playerCamera.transform.eulerAngles.y, 0f);
+        }
         
         // Handle Drag based strictly on state
         if (currentState == PlayerState.Grounded)
-            rb.drag = groundDrag;
+            rb.linearDamping = groundDrag;
         else if (currentState == PlayerState.Air)
-            rb.drag = airDrag;
+            rb.linearDamping = airDrag;
         else
-            rb.drag = 0; // Dash and WallRun ignore drag
+            rb.linearDamping = 0; // Dash and WallRun ignore drag
             
         SpeedControl();
     }
@@ -278,7 +292,7 @@ public class KineticPlayerController : MonoBehaviour
         if (currentState == PlayerState.Dashing || currentState == PlayerState.WallRunning) 
             return;
 
-        Vector3 flatVel = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
+        Vector3 flatVel = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         float currentMaxSpeed = 0f;
 
         if (currentState == PlayerState.Grounded)
@@ -296,13 +310,13 @@ public class KineticPlayerController : MonoBehaviour
         if (flatVel.magnitude > currentMaxSpeed)
         {
             Vector3 limitedVel = flatVel.normalized * currentMaxSpeed;
-            rb.velocity = new Vector3(limitedVel.x, rb.velocity.y, limitedVel.z);
+            rb.linearVelocity = new Vector3(limitedVel.x, rb.linearVelocity.y, limitedVel.z);
         }
     }
 
     private void Jump()
     {
-        rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
+        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         float jumpVel = Mathf.Sqrt(2f * Mathf.Abs(Physics.gravity.y) * jumpHeight);
         rb.AddForce(transform.up * jumpVel, ForceMode.VelocityChange);
     }
@@ -312,7 +326,7 @@ public class KineticPlayerController : MonoBehaviour
         canDoubleJump = false;
         
         // Preserve X and Z velocity (could be dash velocity or air velocity), apply exact Y jump
-        rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
+        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         float jumpVel = Mathf.Sqrt(2f * Mathf.Abs(Physics.gravity.y) * jumpHeight);
         rb.AddForce(transform.up * jumpVel, ForceMode.VelocityChange);
     }
@@ -338,9 +352,9 @@ public class KineticPlayerController : MonoBehaviour
         dashTimeLeft -= Time.fixedDeltaTime;
         
         // Lock X and Z to dash properties, but allow Y velocity to exist if they Double Jumped during dash
-        rb.velocity = new Vector3(
+        rb.linearVelocity = new Vector3(
             dashDirection.x * dashSpeed, 
-            rb.velocity.y, 
+            rb.linearVelocity.y, 
             dashDirection.z * dashSpeed
         );
 
@@ -357,9 +371,9 @@ public class KineticPlayerController : MonoBehaviour
         
         // Once dash duration is over, immediately drop velocity to normal air max speed.
         // This ensures air movement properties never inherit dash velocity.
-        rb.velocity = new Vector3(
+        rb.linearVelocity = new Vector3(
             dashDirection.x * maxAirSpeed, 
-            rb.velocity.y, 
+            rb.linearVelocity.y, 
             dashDirection.z * maxAirSpeed
         );
     }
@@ -392,7 +406,7 @@ public class KineticPlayerController : MonoBehaviour
             return; // Gravity re-enables naturally in state transition
         }
 
-        rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
+        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
 
         Vector3 wallNormal = isWallRight ? rightWallHit.normal : leftWallHit.normal;
         Vector3 wallForward = Vector3.Cross(wallNormal, transform.up);
@@ -415,7 +429,7 @@ public class KineticPlayerController : MonoBehaviour
         Vector3 wallNormal = isWallRight ? rightWallHit.normal : leftWallHit.normal;
         Vector3 forceToApply = orientation.forward * wallJumpForwardForce + wallNormal * wallJumpSideForce + transform.up * wallJumpUpForce;
 
-        rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
+        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         rb.AddForce(forceToApply, ForceMode.Impulse);
         
         StopWallRun();
@@ -426,7 +440,7 @@ public class KineticPlayerController : MonoBehaviour
         if (playerCamera == null) return;
 
         float targetFOV = minFOV;
-        Vector3 flatVel = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
+        Vector3 flatVel = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         float currentSpeed = flatVel.magnitude;
 
         if (currentState == PlayerState.Grounded && currentSpeed > walkSpeed)
