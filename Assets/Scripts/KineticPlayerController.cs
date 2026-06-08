@@ -96,6 +96,7 @@ public class KineticPlayerController : MonoBehaviour
     public float MaxStamina => maxStamina;
     public PlayerState CurrentState => currentState;
     public float CurrentSpeed => new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z).magnitude;
+    public Vector3 Velocity => rb.linearVelocity;
     public float WalkSpeed => walkSpeed;
     public float RunSpeed => runSpeed;
 
@@ -319,7 +320,7 @@ public class KineticPlayerController : MonoBehaviour
 
     private void Jump()
     {
-        if (vfxManager != null) vfxManager.PlayJumpBurst();
+        if (vfxManager != null) vfxManager.PlayBurst(transform.up, vfxManager.JumpBurstCount);
         
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         float jumpVel = Mathf.Sqrt(2f * Mathf.Abs(Physics.gravity.y) * jumpHeight);
@@ -328,7 +329,7 @@ public class KineticPlayerController : MonoBehaviour
 
     private void DoubleJump()
     {
-        if (vfxManager != null) vfxManager.PlayJumpBurst();
+        if (vfxManager != null) vfxManager.PlayBurst(transform.up, vfxManager.JumpBurstCount);
         
         canDoubleJump = false;
         
@@ -340,8 +341,6 @@ public class KineticPlayerController : MonoBehaviour
 
     private void StartDash()
     {
-        if (vfxManager != null) vfxManager.PlayDashBurst();
-        
         currentStamina -= dashStaminaCost;
         currentState = PlayerState.Dashing;
         dashTimeLeft = dashDuration;
@@ -354,6 +353,8 @@ public class KineticPlayerController : MonoBehaviour
             dashDirection = orientation.forward;
         else 
             dashDirection = moveDirection;
+
+        if (vfxManager != null) vfxManager.PlayBurst(dashDirection, vfxManager.DashBurstCount);
     }
 
     private void PerformDash()
@@ -403,6 +404,17 @@ public class KineticPlayerController : MonoBehaviour
         currentState = PlayerState.WallRunning;
         rb.useGravity = false;
         canDoubleJump = true; 
+
+        if (vfxManager != null) 
+        {
+            Vector3 wallNormal = isWallRight ? rightWallHit.normal : leftWallHit.normal;
+            Vector3 wallForward = Vector3.Cross(wallNormal, transform.up);
+
+            if ((orientation.forward - wallForward).magnitude > (orientation.forward - -wallForward).magnitude)
+                wallForward = -wallForward;
+
+            vfxManager.StartWallRunVFX(wallForward);
+        }
     }
 
     private void PerformWallRun()
@@ -431,15 +443,16 @@ public class KineticPlayerController : MonoBehaviour
     {
         rb.useGravity = true;
         currentState = PlayerState.Air;
+        if (vfxManager != null) vfxManager.StopWallRunVFX();
     }
 
     private void WallJump()
     {
-        if (vfxManager != null) vfxManager.PlayJumpBurst();
-        
         Vector3 wallNormal = isWallRight ? rightWallHit.normal : leftWallHit.normal;
         Vector3 forceToApply = orientation.forward * wallJumpForwardForce + wallNormal * wallJumpSideForce + transform.up * wallJumpUpForce;
 
+        if (vfxManager != null) vfxManager.PlayBurst(forceToApply.normalized, vfxManager.JumpBurstCount);
+        
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         rb.AddForce(forceToApply, ForceMode.Impulse);
         

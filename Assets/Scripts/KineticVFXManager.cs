@@ -3,14 +3,7 @@ using UnityEngine;
 public class KineticVFXManager : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private KineticPlayerController playerController;
     [SerializeField] private ParticleSystem speedLinesParticles;
-
-    [Header("Continuous Speed Settings")]
-    [SerializeField, Tooltip("Speed threshold above which speed lines start appearing")]
-    private float speedThreshold = 8f;
-    [SerializeField, Tooltip("Maximum emission rate when at max speed")]
-    private float maxEmissionRate = 60f;
 
     [Header("Burst Settings")]
     [SerializeField, Tooltip("Number of particles to emit on dash")]
@@ -18,56 +11,54 @@ public class KineticVFXManager : MonoBehaviour
     [SerializeField, Tooltip("Number of particles to emit on jump")]
     private int jumpBurstCount = 20;
 
+    [Header("Wall Run Settings")]
+    [SerializeField, Tooltip("Emission rate during wall run")]
+    private float wallRunEmissionRate = 60f;
+
+    [Header("Dynamic Rotation")]
+    [SerializeField, Tooltip("If true, rotates particles to face backward (-direction)")]
+    private bool faceBackward = true;
+
     private ParticleSystem.EmissionModule emissionModule;
+
+    public int DashBurstCount => dashBurstCount;
+    public int JumpBurstCount => jumpBurstCount;
 
     private void Start()
     {
         if (speedLinesParticles != null)
         {
             emissionModule = speedLinesParticles.emission;
-            // Disable continuous emission initially, as we'll drive it via script
+            // Disable continuous emission initially
             emissionModule.rateOverTime = 0f;
         }
     }
 
-    private void Update()
+    public void PlayBurst(Vector3 direction, int count)
     {
-        if (playerController == null || speedLinesParticles == null) return;
-
-        // 1. Manage continuous speed lines based on current kinetic momentum
-        float currentSpeed = playerController.CurrentSpeed;
-
-        if (currentSpeed > speedThreshold)
+        if (speedLinesParticles != null && direction != Vector3.zero)
         {
-            // Calculate a 0-1 ratio of how far past the threshold we are, capped slightly above RunSpeed
-            float maxExpectedSpeed = playerController.RunSpeed + 5f; 
-            float speedRatio = Mathf.Clamp01((currentSpeed - speedThreshold) / (maxExpectedSpeed - speedThreshold));
-            
-            // Smoothly lerp emission rate so wind lines fade in as you accelerate
-            emissionModule.rateOverTime = Mathf.Lerp(0f, maxEmissionRate, speedRatio);
+            Vector3 finalDirection = faceBackward ? -direction : direction;
+            speedLinesParticles.transform.rotation = Quaternion.LookRotation(finalDirection);
+            speedLinesParticles.Emit(count);
         }
-        else
+    }
+
+    public void StartWallRunVFX(Vector3 direction)
+    {
+        if (speedLinesParticles != null && direction != Vector3.zero)
         {
-            // Stop emitting when moving too slowly
+            Vector3 finalDirection = faceBackward ? -direction : direction;
+            speedLinesParticles.transform.rotation = Quaternion.LookRotation(finalDirection);
+            emissionModule.rateOverTime = wallRunEmissionRate;
+        }
+    }
+
+    public void StopWallRunVFX()
+    {
+        if (speedLinesParticles != null)
+        {
             emissionModule.rateOverTime = 0f;
-        }
-    }
-
-    // --- Public Burst Methods for KineticPlayerController to call ---
-
-    public void PlayDashBurst()
-    {
-        if (speedLinesParticles != null)
-        {
-            speedLinesParticles.Emit(dashBurstCount);
-        }
-    }
-
-    public void PlayJumpBurst()
-    {
-        if (speedLinesParticles != null)
-        {
-            speedLinesParticles.Emit(jumpBurstCount);
         }
     }
 }
