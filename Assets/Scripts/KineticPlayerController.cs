@@ -62,7 +62,10 @@ public class KineticPlayerController : MonoBehaviour
     [SerializeField] private float wallDistance = 0.6f;
     [SerializeField] private float wallJumpUpForce = 7f;
     [SerializeField] private float wallJumpForwardForce = 10f;
-    [SerializeField] private float wallJumpSideForce = 12f;
+    [SerializeField, Tooltip("Force applied strictly OUTWARD from the wall to prevent infinite scaling on a flat surface")]
+    private float wallJumpSideForce = 12f;
+    [SerializeField, Tooltip("Cooldown preventing re-attaching to a wall immediately after jumping off")]
+    private float wallJumpCooldown = 0.25f;
 
     [Header("Camera Dynamics")]
     [SerializeField] private float minFOV = 60f;
@@ -90,6 +93,8 @@ public class KineticPlayerController : MonoBehaviour
     private bool isWallLeft;
     private RaycastHit leftWallHit;
     private RaycastHit rightWallHit;
+
+    private float wallJumpCooldownTimer;
 
     // --- Public Getters for UI and Camera ---
     public float CurrentStamina => currentStamina;
@@ -165,6 +170,9 @@ public class KineticPlayerController : MonoBehaviour
         else
             rb.linearDamping = 0; // Dash and WallRun ignore drag
             
+        if (wallJumpCooldownTimer > 0)
+            wallJumpCooldownTimer -= Time.deltaTime;
+
         SpeedControl();
     }
 
@@ -204,7 +212,8 @@ public class KineticPlayerController : MonoBehaviour
             isWallRight = Physics.Raycast(transform.position, orientation.right, out rightWallHit, wallDistance, whatIsWall);
             isWallLeft = Physics.Raycast(transform.position, -orientation.right, out leftWallHit, wallDistance, whatIsWall);
 
-            if ((isWallRight || isWallLeft) && !isGrounded && inputDirection.y > 0)
+            // Cannot start wall run if the cooldown is active
+            if ((isWallRight || isWallLeft) && !isGrounded && inputDirection.y > 0 && wallJumpCooldownTimer <= 0)
             {
                 if (currentState != PlayerState.WallRunning && currentStamina > 0)
                 {
@@ -449,13 +458,22 @@ public class KineticPlayerController : MonoBehaviour
     private void WallJump()
     {
         Vector3 wallNormal = isWallRight ? rightWallHit.normal : leftWallHit.normal;
+        
+        // Apply upward and OUTWARD force to push player away from the wall
         Vector3 forceToApply = orientation.forward * wallJumpForwardForce + wallNormal * wallJumpSideForce + transform.up * wallJumpUpForce;
 
         if (vfxManager != null) vfxManager.PlayBurst(forceToApply.normalized, vfxManager.JumpBurstCount);
         
+        // Explicitly refresh double jump, ensuring infinite wall jumps
+        canDoubleJump = true; 
+
+        // Apply force
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         rb.AddForce(forceToApply, ForceMode.Impulse);
         
+        // Start cooldown to prevent instant re-attachment
+        wallJumpCooldownTimer = wallJumpCooldown;
+
         StopWallRun();
     }
 
